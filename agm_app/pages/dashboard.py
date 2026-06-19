@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+import base64
 from database import get_stats, get_servicios_full
 
 COLORS = {
@@ -19,6 +20,15 @@ COLORS = {
 }
 
 PALETTE = ['#CC0000','#D4AF37','#228844','#1a6dc0','#CC8800','#AA44AA','#44AACC']
+
+_MOTOGP_PATH = os.path.join(os.path.dirname(__file__), '..', 'MOTOGP.jpg')
+
+def _motogp_b64():
+    try:
+        with open(_MOTOGP_PATH, 'rb') as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception:
+        return None
 
 
 def fmt_money(v):
@@ -44,14 +54,23 @@ def kpi(label, value, sub='', color='#CC0000'):
 
 
 def show():
-    st.markdown("""
+    img_b64 = _motogp_b64()
+    if img_b64:
+        img_html = (f'<img src="data:image/jpeg;base64,{img_b64}" '
+                    f'style="height:100px;object-fit:contain;border-radius:6px;'
+                    f'margin-right:16px;filter:drop-shadow(0 0 10px rgba(204,0,0,0.5));" '
+                    f'alt="MotoGP">')
+    else:
+        img_html = '<div class="hdr-icon">🏍️</div>'
+
+    st.markdown(f"""
     <div class="agm-header" style="display:flex;align-items:center;justify-content:space-between;">
         <div style="padding:18px 20px 14px 24px;">
             <span class="hdr-tag">◆ PANEL DE CONTROL ◆</span>
             <span class="hdr-title">DASHBOARD <span class="hdr-dash"> — </span><span class="hdr-sub">Estadísticas del Taller</span></span>
             <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
         </div>
-        <div class="hdr-icon">🏍️</div>
+        {img_html}
     </div>""", unsafe_allow_html=True)
 
     stats = get_stats()
