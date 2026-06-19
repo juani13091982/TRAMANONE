@@ -87,6 +87,9 @@ st.markdown("""
 .badge-entregado  { background:#555555; color:white; padding:2px 10px; border-radius:12px; font-size:11px; }
 
 div[data-testid="stMetric"] { background: #F9F9F9; border-radius:6px; padding:10px; }
+
+/* Ocultar navegación automática de Streamlit (usamos la propia del sidebar) */
+[data-testid="stSidebarNav"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 

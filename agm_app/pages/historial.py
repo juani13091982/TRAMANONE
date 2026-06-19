@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import streamlit as st
 import pandas as pd
 import json, os, tempfile
-from database import get_servicios_full, get_servicio, get_cliente, get_moto, update_servicio
+from database import get_servicios_full, get_servicio, get_cliente, get_moto, update_servicio, delete_servicio
 from pdf_export import generate_pdf
 
 
@@ -88,7 +88,24 @@ def show():
         moto = get_moto(srv['moto_id'])
 
         st.markdown("---")
-        st.markdown(f"### Detalle: `{srv['numero_orden']}`")
+        col_titulo, col_del = st.columns([5,1])
+        col_titulo.markdown(f"### Detalle: `{srv['numero_orden']}`")
+
+        # Botón eliminar con confirmación
+        with col_del:
+            if st.button("🗑️ Eliminar", key=f"del_srv_{sid}", help="Eliminar este servicio"):
+                st.session_state[f"confirm_del_{sid}"] = True
+        if st.session_state.get(f"confirm_del_{sid}"):
+            st.error(f"⚠️ ¿Confirmar eliminación de **{srv['numero_orden']}**? Esta acción no se puede deshacer.")
+            c_si, c_no = st.columns(2)
+            if c_si.button("✅ Sí, eliminar", key=f"confirm_yes_{sid}"):
+                delete_servicio(sid)
+                st.session_state.pop(f"confirm_del_{sid}", None)
+                st.success("Servicio eliminado.")
+                st.rerun()
+            if c_no.button("❌ Cancelar", key=f"confirm_no_{sid}"):
+                st.session_state.pop(f"confirm_del_{sid}", None)
+                st.rerun()
 
         tab1, tab2, tab3, tab4 = st.tabs(["📋 Resumen", "🔧 Trabajos & Inspección", "⚡ Performance", "💰 Presupuesto"])
 
@@ -167,9 +184,25 @@ def show():
         with tab4:
             items = json.loads(srv.get('items_presupuesto','[]') or '[]')
             if items:
-                df_p = pd.DataFrame(items)
-                st.dataframe(df_p, use_container_width=True, hide_index=True)
-            st.metric("TOTAL A PAGAR", f"${float(srv.get('total',0) or 0):,.2f}")
+                # Vista del dueño: incluye % ganancia por ítem
+                df_owner = pd.DataFrame(items)
+                cols_show = [c for c in ['desc','cant','precio','ganancia_pct','total'] if c in df_owner.columns]
+                rename_map = {'desc':'Descripción','cant':'Cant','precio':'P. Unit.','ganancia_pct':'% Ganancia 🔒','total':'Total'}
+                st.markdown("**Detalle de ítems (vista dueño):**")
+                st.dataframe(df_owner[cols_show].rename(columns=rename_map), use_container_width=True, hide_index=True)
+
+            subtotal   = float(srv.get('subtotal', 0) or 0)
+            iva_pct    = float(srv.get('iva_porcentaje', 0) or 0)
+            iva_monto  = float(srv.get('iva_monto', 0) or 0)
+            total      = float(srv.get('total', 0) or 0)
+
+            st.markdown("---")
+            c1, c2 = st.columns([3,1])
+            with c2:
+                st.metric("Subtotal", f"${subtotal:,.2f}")
+                if iva_pct > 0:
+                    st.metric(f"IVA ({iva_pct:.0f}%)", f"${iva_monto:,.2f}")
+                st.metric("**TOTAL A PAGAR**", f"${total:,.2f}")
 
         # ── DESCARGA PDF ──────────────────────────────────────────────
         st.markdown("---")

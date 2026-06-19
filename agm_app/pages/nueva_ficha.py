@@ -193,34 +193,49 @@ def show():
     st.markdown('<div class="sec-hdr">💰 PRESUPUESTO / DETALLE DE TRABAJOS</div>', unsafe_allow_html=True)
 
     if 'pres_items' not in st.session_state:
-        st.session_state.pres_items = [{'desc':'','cant':1,'precio':0.0}]
+        st.session_state.pres_items = [{'desc':'','cant':1,'precio':0.0,'ganancia_pct':0}]
 
     def add_item():
-        st.session_state.pres_items.append({'desc':'','cant':1,'precio':0.0})
+        st.session_state.pres_items.append({'desc':'','cant':1,'precio':0.0,'ganancia_pct':0})
     def remove_item(i):
         st.session_state.pres_items.pop(i)
+
+    # Encabezados de columnas
+    h1,h2,h3,h4,h5 = st.columns([4,1,2,1.5,0.5])
+    h1.markdown("**Descripción**")
+    h2.markdown("**Cant**")
+    h3.markdown("**Precio unit.**")
+    h4.markdown("**% Ganancia** 🔒")
+    h5.markdown("")
 
     items_out = []
     subtotal  = 0.0
     for idx, item in enumerate(st.session_state.pres_items):
-        c1,c2,c3,c4 = st.columns([5,1,2,1])
-        desc  = c1.text_input(f"Descripción",   key=f"desc_{idx}",  value=item.get('desc',''), label_visibility='collapsed' if idx > 0 else 'visible')
-        cant  = c2.number_input("Cant", min_value=1, step=1, key=f"cant_{idx}", value=item.get('cant',1), label_visibility='collapsed' if idx > 0 else 'visible')
-        prec  = c3.number_input("Precio unit.",  min_value=0.0, step=100.0, key=f"prec_{idx}", value=float(item.get('precio',0)), format="%.2f", label_visibility='collapsed' if idx > 0 else 'visible')
+        c1,c2,c3,c4,c5 = st.columns([4,1,2,1.5,0.5])
+        desc     = c1.text_input("Desc",       key=f"desc_{idx}",  value=item.get('desc',''),          label_visibility='collapsed')
+        cant     = c2.number_input("Cant",     key=f"cant_{idx}",  value=item.get('cant',1),            min_value=1, step=1,     label_visibility='collapsed')
+        prec     = c3.number_input("Precio",   key=f"prec_{idx}",  value=float(item.get('precio',0)),   min_value=0.0, step=100.0, format="%.2f", label_visibility='collapsed')
+        gan_pct  = c4.number_input("% Gan",   key=f"gan_{idx}",   value=int(item.get('ganancia_pct',0)), min_value=0, max_value=500, step=5,    label_visibility='collapsed')
         total_item = cant * prec
         subtotal  += total_item
-        items_out.append({'desc': desc, 'cant': cant, 'precio': f"{prec:.2f}", 'total': f"{total_item:.2f}"})
-        if c4.button("🗑", key=f"del_{idx}", help="Eliminar línea") and len(st.session_state.pres_items) > 1:
+        items_out.append({'desc': desc, 'cant': cant, 'precio': f"{prec:.2f}", 'ganancia_pct': gan_pct, 'total': f"{total_item:.2f}"})
+        if c5.button("🗑", key=f"del_{idx}", help="Eliminar línea") and len(st.session_state.pres_items) > 1:
             remove_item(idx)
             st.rerun()
 
     st.button("➕ Agregar línea", on_click=add_item)
-    total = subtotal
 
-    col_sub, col_tot = st.columns([3,1])
-    col_sub.empty()
+    # IVA y totales
+    st.markdown("---")
+    col_iva, col_tot = st.columns([3,1])
+    col_iva.empty()
     with col_tot:
+        iva_pct   = st.number_input("IVA %", min_value=0.0, max_value=100.0, step=0.5, value=0.0, format="%.1f", key="iva_pct_input")
+        iva_monto = subtotal * iva_pct / 100
+        total     = subtotal + iva_monto
         st.markdown(f"**Subtotal: ${subtotal:,.2f}**")
+        if iva_pct > 0:
+            st.markdown(f"**IVA ({iva_pct:.0f}%): ${iva_monto:,.2f}**")
         st.markdown(f"### 💵 Total: `${total:,.2f}`")
 
     estado_srv = st.selectbox("Estado del servicio", ["Pendiente","En proceso","Completado","Entregado"])
@@ -238,6 +253,11 @@ def show():
         if moto_nueva and not moto_data.get('dominio','').strip():
             st.error("El dominio/patente de la moto es obligatorio.")
             return
+
+        # Capturar valores de IVA del widget antes del spinner
+        iva_pct   = st.session_state.get("iva_pct_input", 0.0)
+        iva_monto = subtotal * iva_pct / 100
+        total     = subtotal + iva_monto
 
         with st.spinner("Guardando y generando PDF..."):
             # Guardar / obtener cliente
@@ -290,7 +310,10 @@ def show():
                 observaciones=observaciones,
                 # presupuesto
                 items_presupuesto=json.dumps(items_out),
-                subtotal=subtotal, total=total,
+                subtotal=subtotal,
+                iva_porcentaje=iva_pct,
+                iva_monto=iva_monto,
+                total=total,
             )
 
             sid = insert_servicio(srv_data)

@@ -136,9 +136,17 @@ def init_db():
             observaciones        TEXT DEFAULT '',
             items_presupuesto    TEXT DEFAULT '[]',
             subtotal             FLOAT DEFAULT 0,
+            iva_porcentaje       FLOAT DEFAULT 0,
+            iva_monto            FLOAT DEFAULT 0,
             total                FLOAT DEFAULT 0,
             created_at           TEXT
         )"""))
+        # Migración: agregar columnas nuevas si no existen (tablas ya creadas)
+        for col_def in ["iva_porcentaje FLOAT DEFAULT 0", "iva_monto FLOAT DEFAULT 0"]:
+            try:
+                conn.execute(text(f"ALTER TABLE servicios ADD COLUMN {col_def}"))
+            except Exception:
+                pass
 
 
 # ── CLIENTES ─────────────────────────────────────────────────────────────────
@@ -259,6 +267,10 @@ def get_servicios_full(limit=500):
             ORDER BY s.fecha_ingreso DESC, s.id DESC
             LIMIT {int(limit)}
         """)))
+
+def delete_servicio(sid: int):
+    with _get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM servicios WHERE id=:id"), {"id": sid})
 
 def get_stats():
     with _get_engine().connect() as conn:

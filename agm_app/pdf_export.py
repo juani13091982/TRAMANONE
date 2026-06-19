@@ -354,26 +354,36 @@ def generate_pdf(srv: dict, cliente: dict, moto: dict, output_path: str):
             p('<font color="#EEEEEE" size="8">$ ──</font>', ps(f'pue{i}',color=DARK,align=TA_RIGHT)),
             p('<font color="#EEEEEE" size="8">$ ──</font>', ps(f'pte{i}',color=DARK,align=TA_RIGHT)),
         ])
-    subtotal = srv.get('subtotal', 0) or 0
-    total    = srv.get('total', 0) or 0
-    pr += [
-        ['','','', p('<b>SUBTOTAL</b>', ps('sub_p',color=LG,bold=True,align=TA_RIGHT)),
-                   p(f'<b>$ {subtotal:,.2f}</b>', ps('subv_p',color=DARK,bold=True,align=TA_RIGHT))],
-        ['','','', p('<b>TOTAL A PAGAR</b>', ps('tot_p',color=white,bold=True,align=TA_RIGHT)),
-                   p(f'<b>$ {total:,.2f}</b>', ps('totv_p',color=white,bold=True,align=TA_RIGHT))],
-    ]
+    subtotal  = float(srv.get('subtotal', 0) or 0)
+    iva_pct   = float(srv.get('iva_porcentaje', 0) or 0)
+    iva_monto = float(srv.get('iva_monto', 0) or 0)
+    total     = float(srv.get('total', 0) or 0)
+
+    pr.append(['','','',
+        p('<b>SUBTOTAL</b>', ps('sub_p',color=LG,bold=True,align=TA_RIGHT)),
+        p(f'<b>$ {subtotal:,.2f}</b>', ps('subv_p',color=DARK,bold=True,align=TA_RIGHT))])
+    if iva_pct > 0:
+        pr.append(['','','',
+            p(f'<b>IVA ({iva_pct:.0f}%)</b>', ps('iva_p',color=LG,bold=True,align=TA_RIGHT)),
+            p(f'<b>$ {iva_monto:,.2f}</b>', ps('ivav_p',color=DARK,bold=True,align=TA_RIGHT))])
+    pr.append(['','','',
+        p('<b>TOTAL A PAGAR</b>', ps('tot_p',color=white,bold=True,align=TA_RIGHT)),
+        p(f'<b>$ {total:,.2f}</b>', ps('totv_p',color=white,bold=True,align=TA_RIGHT))])
+
     cw = [TW*0.05, TW*0.50, TW*0.10, TW*0.18, TW*0.17]
     t_pr = Table(pr, colWidths=cw)
+    n_footer = 2 if iva_pct > 0 else 1  # filas de totales al final (sin contar TOTAL)
     ps_ = [
         ('BACKGROUND',(0,0),(-1,0),DARK), ('LINEBELOW',(0,0),(-1,0),1,RED),
         ('LEFTPADDING',(0,0),(-1,-1),6),  ('RIGHTPADDING',(0,0),(-1,-1),6),
         ('TOPPADDING',(0,0),(-1,-1),4),   ('BOTTOMPADDING',(0,0),(-1,-1),5),
-        ('GRID',(0,1),(-1,-3),0.5,GR),
-        ('BACKGROUND',(0,-2),(-1,-2),HexColor('#F5F5F5')),
+        ('GRID',(0,1),(-1,-(n_footer+2)),0.5,GR),
         ('BACKGROUND',(0,-1),(-1,-1),DARK),
-        ('LINEABOVE',(0,-2),(-1,-2),0.5,GR), ('LINEABOVE',(0,-1),(-1,-1),2,RED),
-        ('SPAN',(0,-2),(2,-2)), ('SPAN',(0,-1),(2,-1)),
-        *[('BACKGROUND',(0,i),(-1,i), BG1 if i%2==0 else BG2) for i in range(1,len(pr)-2)],
+        ('LINEABOVE',(0,-1),(-1,-1),2,RED),
+        ('SPAN',(0,-1),(2,-1)),
+        *[('BACKGROUND',(0,-i-2),(-1,-i-2), HexColor('#F5F5F5')) for i in range(n_footer)],
+        *[('SPAN',(0,-i-2),(2,-i-2)) for i in range(n_footer)],
+        *[('BACKGROUND',(0,i),(-1,i), BG1 if i%2==0 else BG2) for i in range(1,len(pr)-n_footer-1)],
     ]
     t_pr.setStyle(TableStyle(ps_))
     els += [t_pr, Spacer(1,3*mm)]
