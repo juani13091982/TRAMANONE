@@ -30,9 +30,9 @@ def show():
         f_moto    = c2.text_input("Moto (marca / modelo / dominio)")
         f_estado  = c3.selectbox("Estado", ["Todos","Pendiente","En proceso","Completado","Entregado"])
         c_desde, c_hasta = st.columns(2)
-        from datetime import date as dt
-        f_desde   = c_desde.date_input("Desde", value=dt(dt.today().year, 1, 1))
-        f_hasta   = c_hasta.date_input("Hasta", value=dt.today())
+        from datetime import date as dt, timedelta
+        f_desde   = c_desde.date_input("Desde", value=dt(2024, 1, 1))
+        f_hasta   = c_hasta.date_input("Hasta", value=dt.today() + timedelta(days=365))
 
     # Aplicar filtros
     mask = pd.Series([True]*len(df))
