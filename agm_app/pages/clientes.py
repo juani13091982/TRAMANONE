@@ -3,12 +3,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 """Gestión de clientes — AGM Performance."""
 import streamlit as st
 import pandas as pd
-from database import get_clientes, get_motos_cliente, get_servicios_full
+from database import get_clientes, get_motos_cliente, get_servicios_full, update_servicio
+
+ESTADOS = ['Pendiente', 'En proceso', 'Completado', 'Entregado']
 
 
 def show():
-    st.markdown('<div class="agm-header"><span>CLIENTES</span><h2>Gestión de Clientes</h2></div>',
-                unsafe_allow_html=True)
+    st.markdown("""
+    <div class="agm-header" style="padding:18px 20px 14px 24px;">
+        <span class="hdr-tag">◆ GESTIÓN ◆</span>
+        <span class="hdr-title">CLIENTES <span class="hdr-dash"> — </span><span class="hdr-sub">Gestión de Clientes</span></span>
+        <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
+    </div>""", unsafe_allow_html=True)
 
     clientes = get_clientes()
     if not clientes:
@@ -85,7 +91,7 @@ def show():
         if hist:
             st.markdown("#### 📋 Historial de servicios")
             df_hist = pd.DataFrame(hist)[['numero_orden','fecha_ingreso','marca','modelo',
-                                           'dominio','total','estado','tecnico']]
+                                           'dominio','total','estado','tecnico']].copy()
             df_hist['total'] = df_hist['total'].apply(lambda x: f"${float(x or 0):,.2f}")
             df_hist = df_hist.rename(columns={
                 'numero_orden':'Orden','fecha_ingreso':'Ingreso','marca':'Marca',
@@ -93,3 +99,19 @@ def show():
                 'tecnico':'Técnico'
             })
             st.dataframe(df_hist, use_container_width=True, hide_index=True)
+
+            # ── CAMBIAR ESTADO ────────────────────────────────────────
+            st.markdown('<div class="sec-hdr">🔄 CAMBIAR ESTADO DEL SERVICIO</div>', unsafe_allow_html=True)
+            with st.form("form_cambio_estado"):
+                ordenes = [s['numero_orden'] for s in hist]
+                col_a, col_b, col_c = st.columns([2,2,1])
+                orden_sel   = col_a.selectbox("Orden", ordenes)
+                nuevo_estado = col_b.selectbox("Nuevo estado", ESTADOS)
+                guardar = col_c.form_submit_button("✅ Guardar", use_container_width=True)
+
+                if guardar:
+                    srv_match = next((s for s in hist if s['numero_orden'] == orden_sel), None)
+                    if srv_match:
+                        update_servicio(srv_match['id'], {'estado': nuevo_estado})
+                        st.success(f"Estado de {orden_sel} actualizado a **{nuevo_estado}**.")
+                        st.rerun()

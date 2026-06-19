@@ -9,8 +9,12 @@ from pdf_export import generate_pdf
 
 
 def show():
-    st.markdown('<div class="agm-header"><span>HISTORIAL</span><h2>Historial de Servicios</h2></div>',
-                unsafe_allow_html=True)
+    st.markdown("""
+    <div class="agm-header" style="padding:18px 20px 14px 24px;">
+        <span class="hdr-tag">◆ REGISTROS ◆</span>
+        <span class="hdr-title">HISTORIAL <span class="hdr-dash"> — </span><span class="hdr-sub">Servicios Realizados</span></span>
+        <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
+    </div>""", unsafe_allow_html=True)
 
     servicios = get_servicios_full(limit=500)
     if not servicios:

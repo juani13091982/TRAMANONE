@@ -21,9 +21,12 @@ def _motos_de(cliente_id):
 
 
 def show():
-    st.markdown('<div class="agm-header"><span>CARGA DE DATOS</span>'
-                '<h2>Nueva Ficha de Service y Diagnóstico</h2></div>',
-                unsafe_allow_html=True)
+    st.markdown("""
+    <div class="agm-header" style="padding:18px 20px 14px 24px;">
+        <span class="hdr-tag">◆ CARGA DE DATOS ◆</span>
+        <span class="hdr-title">NUEVA FICHA <span class="hdr-dash"> — </span><span class="hdr-sub">Service y Diagnóstico</span></span>
+        <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
+    </div>""", unsafe_allow_html=True)
 
     if 'srv_guardado' not in st.session_state:
         st.session_state.srv_guardado = None
