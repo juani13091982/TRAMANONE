@@ -2,8 +2,13 @@
 AGM Performance — Sistema de Gestión de Service
 Aplicación Streamlit principal
 """
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))  # garantiza imports en Streamlit Cloud
+
 import streamlit as st
 from database import init_db
+
+LOGO = os.path.join(os.path.dirname(__file__), "logo.jpg")
 
 st.set_page_config(
     page_title="AGM Performance — Service Manager",
@@ -87,7 +92,8 @@ div[data-testid="stMetric"] { background: #F9F9F9; border-radius:6px; padding:10
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.image("../LOGO TRAMA.JPG.jpeg", width=180)
+    if os.path.exists(LOGO):
+        st.image(LOGO, width=180)
     st.markdown("---")
     st.markdown("### 🏍️ AGM Performance")
     st.markdown("<span style='color:#CC0000;font-size:11px;letter-spacing:1px'>SERVICE · CHIPTUNNING · DIAGNÓSTICO</span>",

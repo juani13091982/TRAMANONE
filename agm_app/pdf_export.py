@@ -9,7 +9,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.pdfgen import canvas as pdfcanvas
 
-LOGO = os.path.join(os.path.dirname(__file__), '..', 'LOGO TRAMA.JPG.jpeg')
+LOGO = os.path.join(os.path.dirname(__file__), 'logo.jpg')
 W, H = A4
 
 RED   = HexColor('#CC0000')

@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 """Historial de servicios con búsqueda, filtros y descarga de PDF."""
 import streamlit as st
 import pandas as pd
