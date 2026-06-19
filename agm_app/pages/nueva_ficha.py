@@ -8,11 +8,21 @@ from database import (get_clientes, upsert_cliente, get_motos_cliente,
                       upsert_moto, next_orden, insert_servicio, get_cliente, get_moto)
 from pdf_export import generate_pdf
 
-MAX_ITEMS = 8   # filas de presupuesto fijas (vacías se ignoran al guardar)
+MAX_ITEMS = 8   # filas de presupuesto (vacías se ignoran al guardar)
+
+# ── Caché de consultas frecuentes (evita ir a la BD en cada rerun) ────────────
+@st.cache_data(ttl=120)
+def _clientes():
+    return get_clientes()
+
+@st.cache_data(ttl=120)
+def _motos_de(cliente_id):
+    return get_motos_cliente(cliente_id)
 
 
 def show():
-    st.markdown('<div class="agm-header"><span>CARGA DE DATOS</span><h2>Nueva Ficha de Service y Diagnóstico</h2></div>',
+    st.markdown('<div class="agm-header"><span>CARGA DE DATOS</span>'
+                '<h2>Nueva Ficha de Service y Diagnóstico</h2></div>',
                 unsafe_allow_html=True)
 
     if 'srv_guardado' not in st.session_state:
@@ -44,25 +54,28 @@ def show():
     st.markdown(f"**N° de Orden:** `{numero_orden}`")
 
     # ══════════════════════════════════════════════════════════════════
-    # 1. ENCABEZADO DE LA ORDEN
+    # FUERA DEL FORM — solo los selectores que controlan campos
+    # condicionales (inevitablemente causan 1 rerun al cambiar).
+    # El resto va dentro del form para eliminar reruns al tipear.
     # ══════════════════════════════════════════════════════════════════
-    st.markdown('<div class="sec-hdr">📋 ENCABEZADO DE LA ORDEN</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    fecha_ing = c1.date_input("Fecha de Ingreso", value=date.today())
-    hora_ing  = c2.time_input("Hora de Ingreso",  value=datetime.now().time())
-    fecha_ent = c3.date_input("Entrega Estimada",  value=date.today())
-    prioridad = c4.selectbox("Prioridad", ["Normal", "Urgente"])
 
-    # ══════════════════════════════════════════════════════════════════
-    # 2. DATOS DEL CLIENTE
-    # ══════════════════════════════════════════════════════════════════
+    # ── ENCABEZADO ────────────────────────────────────────────────────
+    st.markdown('<div class="sec-hdr">📋 ENCABEZADO DE LA ORDEN</div>', unsafe_allow_html=True)
+    e1, e2, e3, e4 = st.columns(4)
+    fecha_ing = e1.date_input("Fecha de Ingreso", value=date.today())
+    hora_ing  = e2.time_input("Hora de Ingreso",  value=datetime.now().time())
+    fecha_ent = e3.date_input("Entrega Estimada",  value=date.today())
+    prioridad = e4.selectbox("Prioridad", ["Normal", "Urgente"])
+
+    # ── SELECTOR DE CLIENTE ───────────────────────────────────────────
     st.markdown('<div class="sec-hdr">👤 DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-    clientes     = get_clientes()
-    cli_nombres  = ["+ Nuevo cliente"] + [f"{c['nombre']} ({c['dni_cuit'] or 'sin DNI'})" for c in clientes]
-    cli_sel      = st.selectbox("Cliente", cli_nombres, label_visibility='collapsed')
+    clientes    = _clientes()
+    cli_nombres = ["+ Nuevo cliente"] + [f"{c['nombre']} ({c['dni_cuit'] or 'sin DNI'})" for c in clientes]
+    cli_sel     = st.selectbox("Cliente", cli_nombres, label_visibility='collapsed')
 
     cliente_id_existente = None
-    cli_obj  = {}
+    cli_obj = {}
+    # Valores por defecto (se sobreescriben en el form si es nuevo cliente)
     cli_nombre = cli_dni = cli_tel = cli_email = cli_dir = cli_ciu = ''
 
     if cli_sel != "+ Nuevo cliente":
@@ -77,28 +90,19 @@ def show():
         cli_ciu    = cli_obj.get('ciudad', '')
         st.info(f"📞 {cli_tel or '─'}  ·  ✉️ {cli_email or '─'}  ·  📍 {cli_ciu or '─'}")
     else:
-        ca, cb = st.columns(2)
-        cli_nombre = ca.text_input("Nombre y Apellido *")
-        cli_dni    = cb.text_input("D.N.I. / C.U.I.T.")
-        cc, cd = st.columns(2)
-        cli_tel    = cc.text_input("Teléfono / Celular")
-        cli_email  = cd.text_input("E-mail")
-        ce, cf = st.columns(2)
-        cli_dir    = ce.text_input("Dirección")
-        cli_ciu    = cf.text_input("Ciudad")
+        st.caption("↓ Completá los datos del nuevo cliente en el formulario de abajo.")
 
-    # ══════════════════════════════════════════════════════════════════
-    # 3. DATOS DE LA MOTOCICLETA
-    # ══════════════════════════════════════════════════════════════════
+    # ── SELECTOR DE MOTO ──────────────────────────────────────────────
     st.markdown('<div class="sec-hdr">🏍️ DATOS DE LA MOTOCICLETA</div>', unsafe_allow_html=True)
     moto_nueva        = True
     moto_obj          = {}
     moto_id_existente = None
+    # Valores por defecto
     moto_marca = moto_modelo = moto_dom = moto_vin = moto_motor = moto_color = ''
     moto_anio  = datetime.now().year
 
     if cliente_id_existente:
-        motos = get_motos_cliente(cliente_id_existente)
+        motos = _motos_de(cliente_id_existente)
         if motos:
             moto_opts = ["+ Nueva moto"] + [f"{m['marca']} {m['modelo']} — {m['dominio']}" for m in motos]
             moto_sel  = st.selectbox("Moto del cliente", moto_opts, label_visibility='collapsed')
@@ -115,30 +119,48 @@ def show():
                 moto_motor  = moto_obj.get('nro_motor', '')
                 moto_color  = moto_obj.get('color', '')
                 st.info(f"VIN: {moto_vin or '─'}  ·  Motor: {moto_motor or '─'}  ·  Color: {moto_color or '─'}")
-
     if moto_nueva:
-        ma, mb, mc = st.columns(3)
-        moto_marca  = ma.text_input("Marca")
-        moto_modelo = mb.text_input("Modelo")
-        moto_anio   = mc.number_input("Año", min_value=1950, max_value=2030,
-                                       value=datetime.now().year, step=1)
-        md, me, mf = st.columns(3)
-        moto_dom   = md.text_input("Dominio / Patente *")
-        moto_vin   = me.text_input("N° de Chasis (VIN)")
-        moto_motor = mf.text_input("N° de Motor")
-        mg, _ = st.columns([1, 2])
-        moto_color = mg.text_input("Color")
-
-    # ── Kilometraje y tipo de uso ──────────────────────────────────
-    c_km, c_uso = st.columns(2)
-    kilometraje = c_km.number_input("Kilometraje actual", min_value=0, step=100, value=0)
-    tipo_uso    = c_uso.selectbox("Tipo de uso", ["Calle", "Ruta", "Mixto", "Pista", "Off-road"])
+        st.caption("↓ Completá los datos de la nueva moto en el formulario de abajo.")
 
     # ══════════════════════════════════════════════════════════════════
-    # FORMULARIO PRINCIPAL — sin reruns hasta GUARDAR
-    # (engloba trabajos, inspección, performance, presupuesto)
+    # FORMULARIO PRINCIPAL — todo lo demás va aquí dentro.
+    # Nada dentro del form recarga la app al escribir/interactuar.
+    # Solo se procesa al presionar GUARDAR.
     # ══════════════════════════════════════════════════════════════════
     with st.form("nueva_ficha_form", border=False):
+
+        # ─── DATOS NUEVO CLIENTE (dentro del form = sin reruns) ───────
+        if cli_sel == "+ Nuevo cliente":
+            st.markdown('<div class="sec-hdr">📝 DATOS DEL NUEVO CLIENTE</div>', unsafe_allow_html=True)
+            fa, fb = st.columns(2)
+            cli_nombre = fa.text_input("Nombre y Apellido *")
+            cli_dni    = fb.text_input("D.N.I. / C.U.I.T.")
+            fc, fd = st.columns(2)
+            cli_tel    = fc.text_input("Teléfono / Celular")
+            cli_email  = fd.text_input("E-mail")
+            fe, ff = st.columns(2)
+            cli_dir    = fe.text_input("Dirección")
+            cli_ciu    = ff.text_input("Ciudad")
+
+        # ─── DATOS NUEVA MOTO (dentro del form = sin reruns) ──────────
+        if moto_nueva:
+            st.markdown('<div class="sec-hdr">🏍️ DATOS DE LA NUEVA MOTOCICLETA</div>', unsafe_allow_html=True)
+            ma, mb, mc = st.columns(3)
+            moto_marca  = ma.text_input("Marca")
+            moto_modelo = mb.text_input("Modelo")
+            moto_anio   = mc.number_input("Año", min_value=1950, max_value=2030,
+                                           value=datetime.now().year, step=1)
+            md, me, mf = st.columns(3)
+            moto_dom   = md.text_input("Dominio / Patente *")
+            moto_vin   = me.text_input("N° de Chasis (VIN)")
+            moto_motor = mf.text_input("N° de Motor")
+            mg, _ = st.columns([1, 2])
+            moto_color = mg.text_input("Color")
+
+        # ─── KILOMETRAJE / TIPO DE USO ────────────────────────────────
+        c_km, c_uso = st.columns(2)
+        kilometraje = c_km.number_input("Kilometraje actual", min_value=0, step=100, value=0)
+        tipo_uso    = c_uso.selectbox("Tipo de uso", ["Calle", "Ruta", "Mixto", "Pista", "Off-road"])
 
         # ─── TRABAJOS ─────────────────────────────────────────────────
         st.markdown('<div class="sec-hdr">🔧 TRABAJOS SOLICITADOS</div>', unsafe_allow_html=True)
@@ -181,8 +203,8 @@ def show():
             ("Suspensión Trasera",     "insp_susp_tras",    ESTADOS_INSP),
             ("Filtro de Combustible",  "insp_filtro_comb",  ESTADOS_INSP),
         ]
-        insp_vals   = {}
-        cols_insp   = st.columns(4)
+        insp_vals = {}
+        cols_insp = st.columns(4)
         for i, (label, key, opts) in enumerate(items_insp):
             with cols_insp[i % 4]:
                 val = st.selectbox(label, opts, key=f"insp_{key}")
@@ -329,6 +351,10 @@ def show():
             os.makedirs(pdf_dir, exist_ok=True)
             pdf_path = os.path.join(pdf_dir, f"{numero_orden}.pdf")
             generate_pdf(srv_data, cli_full, moto_full, pdf_path)
+
+            # Invalidar caché para que el nuevo cliente/moto aparezcan la próxima vez
+            _clientes.clear()
+            _motos_de.clear()
 
             st.session_state.srv_guardado  = {'orden': numero_orden, 'id': sid}
             st.session_state.srv_pdf_path  = pdf_path
