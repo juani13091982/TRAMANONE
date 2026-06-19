@@ -8,6 +8,8 @@ from database import (get_clientes, upsert_cliente, get_motos_cliente,
                       upsert_moto, next_orden, insert_servicio, get_cliente, get_moto)
 from pdf_export import generate_pdf
 
+MAX_ITEMS = 8   # filas de presupuesto fijas (vacías se ignoran al guardar)
+
 
 def show():
     st.markdown('<div class="agm-header"><span>CARGA DE DATOS</span><h2>Nueva Ficha de Service y Diagnóstico</h2></div>',
@@ -17,8 +19,6 @@ def show():
         st.session_state.srv_guardado = None
     if 'srv_pdf_path' not in st.session_state:
         st.session_state.srv_pdf_path = None
-    if 'n_items' not in st.session_state:
-        st.session_state.n_items = 1
 
     # ── SI YA SE GUARDÓ ───────────────────────────────────────────────
     if st.session_state.srv_guardado:
@@ -37,7 +37,6 @@ def show():
             if st.button("➕  Cargar nueva ficha"):
                 st.session_state.srv_guardado = None
                 st.session_state.srv_pdf_path = None
-                st.session_state.n_items = 1
                 st.rerun()
         return
 
@@ -45,137 +44,129 @@ def show():
     st.markdown(f"**N° de Orden:** `{numero_orden}`")
 
     # ══════════════════════════════════════════════════════════════════
-    # FUERA DEL FORMULARIO: selectores que necesitan mostrar/ocultar campos
+    # 1. ENCABEZADO DE LA ORDEN
     # ══════════════════════════════════════════════════════════════════
+    st.markdown('<div class="sec-hdr">📋 ENCABEZADO DE LA ORDEN</div>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    fecha_ing = c1.date_input("Fecha de Ingreso", value=date.today())
+    hora_ing  = c2.time_input("Hora de Ingreso",  value=datetime.now().time())
+    fecha_ent = c3.date_input("Entrega Estimada",  value=date.today())
+    prioridad = c4.selectbox("Prioridad", ["Normal", "Urgente"])
 
-    # ── CLIENTE ───────────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════
+    # 2. DATOS DEL CLIENTE
+    # ══════════════════════════════════════════════════════════════════
     st.markdown('<div class="sec-hdr">👤 DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-    clientes = get_clientes()
-    cli_nombres = ["+ Nuevo cliente"] + [f"{c['nombre']} ({c['dni_cuit'] or 'sin DNI'})" for c in clientes]
-    cli_sel = st.selectbox("Cliente", cli_nombres, label_visibility='collapsed')
+    clientes     = get_clientes()
+    cli_nombres  = ["+ Nuevo cliente"] + [f"{c['nombre']} ({c['dni_cuit'] or 'sin DNI'})" for c in clientes]
+    cli_sel      = st.selectbox("Cliente", cli_nombres, label_visibility='collapsed')
 
     cliente_id_existente = None
-    cli_obj = {}
-    if cli_sel != "+ Nuevo cliente":
-        idx = cli_nombres.index(cli_sel) - 1
-        cli_obj = clientes[idx]
-        cliente_id_existente = cli_obj['id']
-        st.info(f"📞 {cli_obj.get('telefono','─')}  ·  ✉️ {cli_obj.get('email','─')}  ·  📍 {cli_obj.get('ciudad','─')}")
+    cli_obj  = {}
+    cli_nombre = cli_dni = cli_tel = cli_email = cli_dir = cli_ciu = ''
 
-    # ── MOTO ──────────────────────────────────────────────────────────
+    if cli_sel != "+ Nuevo cliente":
+        idx      = cli_nombres.index(cli_sel) - 1
+        cli_obj  = clientes[idx]
+        cliente_id_existente = cli_obj['id']
+        cli_nombre = cli_obj.get('nombre', '')
+        cli_dni    = cli_obj.get('dni_cuit', '')
+        cli_tel    = cli_obj.get('telefono', '')
+        cli_email  = cli_obj.get('email', '')
+        cli_dir    = cli_obj.get('direccion', '')
+        cli_ciu    = cli_obj.get('ciudad', '')
+        st.info(f"📞 {cli_tel or '─'}  ·  ✉️ {cli_email or '─'}  ·  📍 {cli_ciu or '─'}")
+    else:
+        ca, cb = st.columns(2)
+        cli_nombre = ca.text_input("Nombre y Apellido *")
+        cli_dni    = cb.text_input("D.N.I. / C.U.I.T.")
+        cc, cd = st.columns(2)
+        cli_tel    = cc.text_input("Teléfono / Celular")
+        cli_email  = cd.text_input("E-mail")
+        ce, cf = st.columns(2)
+        cli_dir    = ce.text_input("Dirección")
+        cli_ciu    = cf.text_input("Ciudad")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 3. DATOS DE LA MOTOCICLETA
+    # ══════════════════════════════════════════════════════════════════
     st.markdown('<div class="sec-hdr">🏍️ DATOS DE LA MOTOCICLETA</div>', unsafe_allow_html=True)
-    moto_nueva = True
-    moto_obj = {}
+    moto_nueva        = True
+    moto_obj          = {}
     moto_id_existente = None
+    moto_marca = moto_modelo = moto_dom = moto_vin = moto_motor = moto_color = ''
+    moto_anio  = datetime.now().year
 
     if cliente_id_existente:
         motos = get_motos_cliente(cliente_id_existente)
         if motos:
             moto_opts = ["+ Nueva moto"] + [f"{m['marca']} {m['modelo']} — {m['dominio']}" for m in motos]
-            moto_sel = st.selectbox("Moto del cliente", moto_opts, label_visibility='collapsed')
+            moto_sel  = st.selectbox("Moto del cliente", moto_opts, label_visibility='collapsed')
             if moto_sel != "+ Nueva moto":
-                idx2 = moto_opts.index(moto_sel) - 1
-                moto_obj = motos[idx2]
+                idx2              = moto_opts.index(moto_sel) - 1
+                moto_obj          = motos[idx2]
                 moto_id_existente = moto_obj['id']
-                moto_nueva = False
-                st.info(f"VIN: {moto_obj.get('vin','─')}  ·  Motor: {moto_obj.get('nro_motor','─')}  ·  Color: {moto_obj.get('color','─')}")
+                moto_nueva        = False
+                moto_marca  = moto_obj.get('marca', '')
+                moto_modelo = moto_obj.get('modelo', '')
+                moto_anio   = moto_obj.get('anio', datetime.now().year)
+                moto_dom    = moto_obj.get('dominio', '')
+                moto_vin    = moto_obj.get('vin', '')
+                moto_motor  = moto_obj.get('nro_motor', '')
+                moto_color  = moto_obj.get('color', '')
+                st.info(f"VIN: {moto_vin or '─'}  ·  Motor: {moto_motor or '─'}  ·  Color: {moto_color or '─'}")
 
-    # ── LÍNEAS DE PRESUPUESTO (gestión fuera del form) ────────────────
-    st.markdown('<div class="sec-hdr">💰 PRESUPUESTO / DETALLE DE TRABAJOS</div>', unsafe_allow_html=True)
-    ca, cb, _ = st.columns([1, 1, 5])
-    if ca.button("➕ Agregar línea"):
-        st.session_state.n_items += 1
-        st.rerun()
-    if cb.button("➖ Quitar última") and st.session_state.n_items > 1:
-        st.session_state.n_items -= 1
-        st.rerun()
-    st.caption(f"Líneas de presupuesto activas: {st.session_state.n_items}")
+    if moto_nueva:
+        ma, mb, mc = st.columns(3)
+        moto_marca  = ma.text_input("Marca")
+        moto_modelo = mb.text_input("Modelo")
+        moto_anio   = mc.number_input("Año", min_value=1950, max_value=2030,
+                                       value=datetime.now().year, step=1)
+        md, me, mf = st.columns(3)
+        moto_dom   = md.text_input("Dominio / Patente *")
+        moto_vin   = me.text_input("N° de Chasis (VIN)")
+        moto_motor = mf.text_input("N° de Motor")
+        mg, _ = st.columns([1, 2])
+        moto_color = mg.text_input("Color")
+
+    # ── Kilometraje y tipo de uso ──────────────────────────────────
+    c_km, c_uso = st.columns(2)
+    kilometraje = c_km.number_input("Kilometraje actual", min_value=0, step=100, value=0)
+    tipo_uso    = c_uso.selectbox("Tipo de uso", ["Calle", "Ruta", "Mixto", "Pista", "Off-road"])
 
     # ══════════════════════════════════════════════════════════════════
     # FORMULARIO PRINCIPAL — sin reruns hasta GUARDAR
+    # (engloba trabajos, inspección, performance, presupuesto)
     # ══════════════════════════════════════════════════════════════════
     with st.form("nueva_ficha_form", border=False):
 
-        # ─── ENCABEZADO ───────────────────────────────────────────────
-        st.markdown('<div class="sec-hdr">📋 ENCABEZADO DE LA ORDEN</div>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
-        fecha_ing = c1.date_input("Fecha de Ingreso", value=date.today())
-        hora_ing  = c2.time_input("Hora de Ingreso",  value=datetime.now().time())
-        fecha_ent = c3.date_input("Entrega Estimada",  value=date.today())
-        prioridad = c4.selectbox("Prioridad", ["Normal", "Urgente"])
-
-        # ─── CLIENTE (campos nuevos dentro del form) ──────────────────
-        if cli_sel == "+ Nuevo cliente":
-            c1, c2 = st.columns(2)
-            cli_nombre = c1.text_input("Nombre y Apellido *")
-            cli_dni    = c2.text_input("D.N.I. / C.U.I.T.")
-            c3, c4 = st.columns(2)
-            cli_tel    = c3.text_input("Teléfono / Celular")
-            cli_email  = c4.text_input("E-mail")
-            c5, c6 = st.columns(2)
-            cli_dir    = c5.text_input("Dirección")
-            cli_ciu    = c6.text_input("Ciudad")
-        else:
-            cli_nombre = cli_obj.get('nombre', '')
-            cli_dni    = cli_obj.get('dni_cuit', '')
-            cli_tel    = cli_obj.get('telefono', '')
-            cli_email  = cli_obj.get('email', '')
-            cli_dir    = cli_obj.get('direccion', '')
-            cli_ciu    = cli_obj.get('ciudad', '')
-
-        # ─── MOTO (campos nuevos dentro del form) ────────────────────
-        if moto_nueva:
-            c1, c2, c3 = st.columns(3)
-            moto_marca  = c1.text_input("Marca")
-            moto_modelo = c2.text_input("Modelo")
-            moto_anio   = c3.number_input("Año", min_value=1950, max_value=2030,
-                                           value=datetime.now().year, step=1)
-            c4, c5, c6 = st.columns(3)
-            moto_dom    = c4.text_input("Dominio / Patente *")
-            moto_vin    = c5.text_input("N° de Chasis (VIN)")
-            moto_motor  = c6.text_input("N° de Motor")
-            c7, _ = st.columns([1, 2])
-            moto_color  = c7.text_input("Color")
-        else:
-            moto_marca  = moto_obj.get('marca', '')
-            moto_modelo = moto_obj.get('modelo', '')
-            moto_anio   = moto_obj.get('anio', datetime.now().year)
-            moto_dom    = moto_obj.get('dominio', '')
-            moto_vin    = moto_obj.get('vin', '')
-            moto_motor  = moto_obj.get('nro_motor', '')
-            moto_color  = moto_obj.get('color', '')
-
-        c_km, c_uso = st.columns(2)
-        kilometraje = c_km.number_input("Kilometraje actual", min_value=0, step=100, value=0)
-        tipo_uso    = c_uso.selectbox("Tipo de uso", ["Calle","Ruta","Mixto","Pista","Off-road"])
-
         # ─── TRABAJOS ─────────────────────────────────────────────────
         st.markdown('<div class="sec-hdr">🔧 TRABAJOS SOLICITADOS</div>', unsafe_allow_html=True)
-        c1,c2,c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3)
         t_service  = c1.checkbox("Service General")
         t_aceite   = c2.checkbox("Cambio de Aceite Motor")
         t_f_aceite = c3.checkbox("Filtro de Aceite")
-        c4,c5,c6 = st.columns(3)
+        c4, c5, c6 = st.columns(3)
         t_f_aire   = c4.checkbox("Filtro de Aire")
         t_bujias   = c5.checkbox("Cambio de Bujías")
         t_valvulas = c6.checkbox("Regulación de Válvulas")
-        c7,c8,c9 = st.columns(3)
+        c7, c8, c9 = st.columns(3)
         t_diag     = c7.checkbox("Diagnóstico Electrónico")
         t_ecu      = c8.checkbox("Reprogramación ECU / Mapa")
         t_dyno     = c9.checkbox("Banco de Potencia (Dyno)")
-        c10,c11,c12 = st.columns(3)
+        c10, c11, c12 = st.columns(3)
         t_frenos   = c10.checkbox("Control de Frenos")
         t_transm   = c11.checkbox("Control de Transmisión")
         t_susp     = c12.checkbox("Control de Suspensiones")
-        c13,c14,_ = st.columns(3)
-        t_electrica= c13.checkbox("Revisión Eléctrica")
-        t_lavado   = c14.checkbox("Lavado / Detailing")
-        t_otro     = st.text_input("Otro trabajo (describir):", placeholder="...")
+        c13, c14, _ = st.columns(3)
+        t_electrica = c13.checkbox("Revisión Eléctrica")
+        t_lavado    = c14.checkbox("Lavado / Detailing")
+        t_otro = st.text_input("Otro trabajo (describir):", placeholder="...")
 
         # ─── INSPECCIÓN ───────────────────────────────────────────────
         st.markdown('<div class="sec-hdr">🔍 INSPECCIÓN TÉCNICA GENERAL</div>', unsafe_allow_html=True)
-        ESTADOS_INSP = ["─","Bueno","Regular","Cambiar"]
-        ESTADOS_LUC  = ["─","Bueno","Regular","Reparar"]
+        ESTADOS_INSP = ["─", "Bueno", "Regular", "Cambiar"]
+        ESTADOS_LUC  = ["─", "Bueno", "Regular", "Reparar"]
         items_insp = [
             ("Aceite Motor",           "insp_aceite",       ESTADOS_INSP),
             ("Refrigerante/Liq. Fr.",  "insp_refrigerante", ESTADOS_INSP),
@@ -190,8 +181,8 @@ def show():
             ("Suspensión Trasera",     "insp_susp_tras",    ESTADOS_INSP),
             ("Filtro de Combustible",  "insp_filtro_comb",  ESTADOS_INSP),
         ]
-        insp_vals = {}
-        cols_insp = st.columns(4)
+        insp_vals   = {}
+        cols_insp   = st.columns(4)
         for i, (label, key, opts) in enumerate(items_insp):
             with cols_insp[i % 4]:
                 val = st.selectbox(label, opts, key=f"insp_{key}")
@@ -199,16 +190,16 @@ def show():
 
         # ─── PERFORMANCE ──────────────────────────────────────────────
         st.markdown('<div class="sec-hdr">⚡ PERFORMANCE & REPROGRAMACIÓN ECU</div>', unsafe_allow_html=True)
-        c1,c2,c3,c4 = st.columns(4)
-        ecu_leida = c1.checkbox("ECU Original Leída")
-        backup    = c2.checkbox("Backup Realizado")
-        mapa      = c3.text_input("Mapa / Calibración Aplicada")
-        software  = c4.text_input("Herramienta / Software")
-        c5,c6,c7,c8 = st.columns(4)
-        hp_orig  = c5.number_input("Potencia Original (HP)", min_value=0.0, step=0.5, value=0.0, format="%.1f")
-        hp_final = c6.number_input("Potencia Final (HP)",    min_value=0.0, step=0.5, value=0.0, format="%.1f")
-        nm_orig  = c7.number_input("Torque Original (Nm)",   min_value=0.0, step=0.5, value=0.0, format="%.1f")
-        nm_final = c8.number_input("Torque Final (Nm)",      min_value=0.0, step=0.5, value=0.0, format="%.1f")
+        p1, p2, p3, p4 = st.columns(4)
+        ecu_leida = p1.checkbox("ECU Original Leída")
+        backup    = p2.checkbox("Backup Realizado")
+        mapa      = p3.text_input("Mapa / Calibración Aplicada")
+        software  = p4.text_input("Herramienta / Software")
+        p5, p6, p7, p8 = st.columns(4)
+        hp_orig  = p5.number_input("Potencia Original (HP)", min_value=0.0, step=0.5, value=0.0, format="%.1f")
+        hp_final = p6.number_input("Potencia Final (HP)",    min_value=0.0, step=0.5, value=0.0, format="%.1f")
+        nm_orig  = p7.number_input("Torque Original (Nm)",   min_value=0.0, step=0.5, value=0.0, format="%.1f")
+        nm_final = p8.number_input("Torque Final (Nm)",      min_value=0.0, step=0.5, value=0.0, format="%.1f")
 
         # ─── OBSERVACIONES ────────────────────────────────────────────
         st.markdown('<div class="sec-hdr">📝 OBSERVACIONES TÉCNICAS</div>', unsafe_allow_html=True)
@@ -217,28 +208,29 @@ def show():
                                       height=90)
         tecnico = st.text_input("Técnico Responsable", placeholder="Nombre del mecánico")
 
-        # ─── PRESUPUESTO (filas) ──────────────────────────────────────
-        n = st.session_state.n_items
-        h1,h2,h3,h4 = st.columns([4, 1, 2, 1.5])
+        # ─── PRESUPUESTO ──────────────────────────────────────────────
+        st.markdown('<div class="sec-hdr">💰 PRESUPUESTO / DETALLE DE TRABAJOS</div>', unsafe_allow_html=True)
+        st.caption(f"Completá hasta {MAX_ITEMS} líneas. Las filas sin descripción ni costo se ignoran al guardar.")
+        h1, h2, h3, h4 = st.columns([4, 1, 2, 1.5])
         h1.markdown("**Descripción**")
         h2.markdown("**Cant**")
         h3.markdown("**Mi Costo 🔒**")
         h4.markdown("**% Gan. 🔒**")
 
         b_desc = []; b_cant = []; b_costo = []; b_gan = []
-        for idx in range(n):
-            c1,c2,c3,c4 = st.columns([4, 1, 2, 1.5])
-            desc    = c1.text_input("d", key=f"desc_{idx}", placeholder="Descripción...", label_visibility='collapsed')
-            cant    = c2.number_input("c", key=f"cant_{idx}", min_value=1, step=1, value=1, label_visibility='collapsed')
+        for idx in range(MAX_ITEMS):
+            c1, c2, c3, c4 = st.columns([4, 1, 2, 1.5])
+            desc    = c1.text_input("d", key=f"desc_{idx}", placeholder=f"Ítem {idx+1}...",    label_visibility='collapsed')
+            cant    = c2.number_input("c", key=f"cant_{idx}", min_value=1, step=1, value=1,    label_visibility='collapsed')
             costo   = c3.number_input("p", key=f"cost_{idx}", min_value=0.0, step=100.0, value=0.0, format="%.2f", label_visibility='collapsed')
             gan_pct = c4.number_input("g", key=f"gan_{idx}",  min_value=0, max_value=99, step=5, value=0, label_visibility='collapsed')
             b_desc.append(desc); b_cant.append(cant); b_costo.append(costo); b_gan.append(gan_pct)
 
         # ─── IVA y ESTADO ─────────────────────────────────────────────
         st.markdown("---")
-        ci, ce, cs = st.columns([1, 2, 1])
+        ci, ce, _ = st.columns([1, 2, 1])
         iva_pct    = ci.number_input("IVA %", min_value=0.0, max_value=100.0, step=0.5, value=0.0, format="%.1f")
-        estado_srv = ce.selectbox("Estado del servicio", ["Pendiente","En proceso","Completado","Entregado"])
+        estado_srv = ce.selectbox("Estado del servicio", ["Pendiente", "En proceso", "Completado", "Entregado"])
 
         # ─── BOTÓN GUARDAR ────────────────────────────────────────────
         submitted = st.form_submit_button(
@@ -250,7 +242,6 @@ def show():
     # PROCESAMIENTO AL GUARDAR
     # ══════════════════════════════════════════════════════════════════
     if submitted:
-        # Validaciones
         if cli_sel == "+ Nuevo cliente" and not cli_nombre.strip():
             st.error("El nombre del cliente es obligatorio.")
             return
@@ -278,11 +269,13 @@ def show():
             items_out        = []
             subtotal         = 0.0
             ganancia_total_f = 0.0
-            for idx in range(st.session_state.n_items):
+            for idx in range(MAX_ITEMS):
                 desc    = b_desc[idx]
                 cant    = b_cant[idx]
                 costo   = b_costo[idx]
                 gan_pct = b_gan[idx]
+                if not desc.strip() and costo == 0:
+                    continue
                 if 0 < gan_pct < 100:
                     precio_unit = costo / (1 - gan_pct / 100)
                 else:
@@ -291,12 +284,11 @@ def show():
                 ganancia_item = cant * (precio_unit - costo)
                 subtotal         += total_item
                 ganancia_total_f += ganancia_item
-                if desc.strip() or costo > 0:
-                    items_out.append({
-                        'desc': desc, 'cant': cant,
-                        'costo': f"{costo:.2f}", 'ganancia_pct': gan_pct,
-                        'precio': f"{precio_unit:.2f}", 'total': f"{total_item:.2f}"
-                    })
+                items_out.append({
+                    'desc': desc, 'cant': cant,
+                    'costo': f"{costo:.2f}", 'ganancia_pct': gan_pct,
+                    'precio': f"{precio_unit:.2f}", 'total': f"{total_item:.2f}"
+                })
 
             iva_monto = subtotal * iva_pct / 100
             total     = subtotal + iva_monto
@@ -330,7 +322,7 @@ def show():
 
             sid = insert_servicio(srv_data)
 
-            cli_full  = get_cliente(cid)  or {'nombre': cli_nombre}
+            cli_full  = get_cliente(cid) or {'nombre': cli_nombre}
             moto_full = get_moto(mid) or {'marca': moto_marca, 'modelo': moto_modelo,
                                           'dominio': moto_dom, 'anio': moto_anio}
             pdf_dir  = os.path.join(os.path.dirname(__file__), '..', 'pdfs')
@@ -338,8 +330,7 @@ def show():
             pdf_path = os.path.join(pdf_dir, f"{numero_orden}.pdf")
             generate_pdf(srv_data, cli_full, moto_full, pdf_path)
 
-            st.session_state.n_items    = 1
-            st.session_state.srv_guardado = {'orden': numero_orden, 'id': sid}
-            st.session_state.srv_pdf_path = pdf_path
+            st.session_state.srv_guardado  = {'orden': numero_orden, 'id': sid}
+            st.session_state.srv_pdf_path  = pdf_path
 
         st.rerun()
