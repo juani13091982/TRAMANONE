@@ -47,6 +47,19 @@ st.markdown("""
     overflow: hidden;
 }
 
+/* Clases del encabezado del Dashboard — !important para sobrescribir Streamlit */
+.hdr-tag   { display:block; font-size:11px !important; color:#CC0000 !important;
+             letter-spacing:6px; font-weight:700; text-transform:uppercase; margin-bottom:10px; }
+.hdr-title { display:block; font-size:30px !important; color:#FFFFFF !important;
+             font-weight:900; letter-spacing:1.5px; line-height:1.1;
+             text-shadow:0 2px 16px rgba(204,0,0,0.6); }
+.hdr-dash  { color:#CC0000 !important; }
+.hdr-sub   { font-size:21px !important; color:#CCCCCC !important; font-weight:700; }
+.hdr-brand { display:block; font-size:11px !important; color:#777 !important;
+             letter-spacing:2px; text-transform:uppercase; margin-top:8px; }
+.hdr-icon  { font-size:76px; padding:8px 28px 0 16px; line-height:1;
+             filter:drop-shadow(0 0 18px rgba(204,0,0,0.8)); flex-shrink:0; }
+
 /* KPI cards — compactas para 7 columnas */
 .kpi-card {
     background: #1A1A1A;

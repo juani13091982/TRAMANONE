@@ -21,35 +21,6 @@ COLORS = {
 PALETTE = ['#CC0000','#D4AF37','#228844','#1a6dc0','#CC8800','#AA44AA','#44AACC']
 
 
-MOTO_SVG = """
-<svg viewBox="0 0 200 100" width="160" height="80" xmlns="http://www.w3.org/2000/svg" opacity="0.82">
-  <!-- Rueda trasera -->
-  <circle cx="48" cy="72" r="22" fill="none" stroke="#CC0000" stroke-width="5"/>
-  <circle cx="48" cy="72" r="10" fill="#CC0000" opacity="0.4"/>
-  <!-- Rueda delantera -->
-  <circle cx="162" cy="72" r="20" fill="none" stroke="#CC0000" stroke-width="5"/>
-  <circle cx="162" cy="72" r="9" fill="#CC0000" opacity="0.4"/>
-  <!-- Chasis / cuerpo -->
-  <path d="M48,72 L60,42 L100,38 L140,42 L162,52 L162,72" fill="none" stroke="#DDDDDD" stroke-width="3.5" stroke-linejoin="round"/>
-  <!-- Carenado -->
-  <path d="M100,38 Q118,28 140,36 L162,52 L145,48 Q130,34 108,36 Z" fill="#CC0000" opacity="0.85"/>
-  <!-- Tanque -->
-  <path d="M68,42 Q85,30 106,36 L100,38 L70,45 Z" fill="#444"/>
-  <!-- Piloto (cuerpo) -->
-  <path d="M82,40 Q86,22 96,18 Q104,14 108,20 L106,36 Q96,34 86,38 Z" fill="#EEEEEE" opacity="0.9"/>
-  <!-- Casco -->
-  <ellipse cx="100" cy="14" rx="11" ry="10" fill="#CC0000"/>
-  <ellipse cx="103" cy="16" rx="5" ry="3" fill="#222" opacity="0.8"/>
-  <!-- Manubrio -->
-  <line x1="140" y1="42" x2="152" y2="34" stroke="#AAAAAA" stroke-width="3"/>
-  <!-- Brazo -->
-  <line x1="106" y1="26" x2="150" y2="36" stroke="#CCCCCC" stroke-width="2.5"/>
-  <!-- Escape -->
-  <path d="M60,60 Q52,64 48,72" fill="none" stroke="#888" stroke-width="3"/>
-</svg>
-"""
-
-
 def fmt_money(v):
     """Formatea valores monetarios de forma compacta para las tarjetas KPI."""
     try:
@@ -73,24 +44,14 @@ def kpi(label, value, sub='', color='#CC0000'):
 
 
 def show():
-    st.markdown(f"""
-    <div class="agm-header" style="display:flex;align-items:center;justify-content:space-between;padding:18px 28px 14px 24px;">
-        <div>
-            <div style="font-family:'Trebuchet MS','Arial Black',sans-serif;font-size:11px;
-                        color:#CC0000;letter-spacing:6px;font-weight:700;text-transform:uppercase;
-                        margin-bottom:8px;">◆ PANEL DE CONTROL ◆</div>
-            <div style="font-family:'Arial Black','Impact',sans-serif;font-size:28px;
-                        color:#FFFFFF;font-weight:900;letter-spacing:1.5px;line-height:1.1;
-                        text-shadow:0 0 20px rgba(204,0,0,0.4);">
-                DASHBOARD
-                <span style="color:#CC0000;font-size:22px;"> — </span>
-                <span style="font-weight:700;font-size:22px;color:#DDDDDD;">Estadísticas del Taller</span>
-            </div>
-            <div style="margin-top:6px;font-size:11px;color:#777;letter-spacing:2px;text-transform:uppercase;">
-                AGM Performance Service &amp; Chiptunning
-            </div>
+    st.markdown("""
+    <div class="agm-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="padding:18px 20px 14px 24px;">
+            <span class="hdr-tag">◆ PANEL DE CONTROL ◆</span>
+            <span class="hdr-title">DASHBOARD <span class="hdr-dash"> — </span><span class="hdr-sub">Estadísticas del Taller</span></span>
+            <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
         </div>
-        <div style="flex-shrink:0;margin-left:16px;">{MOTO_SVG}</div>
+        <div class="hdr-icon">🏍️</div>
     </div>""", unsafe_allow_html=True)
 
     stats = get_stats()
