@@ -184,25 +184,29 @@ def show():
         with tab4:
             items = json.loads(srv.get('items_presupuesto','[]') or '[]')
             if items:
-                # Vista del dueño: incluye % ganancia por ítem
                 df_owner = pd.DataFrame(items)
-                cols_show = [c for c in ['desc','cant','precio','ganancia_pct','total'] if c in df_owner.columns]
-                rename_map = {'desc':'Descripción','cant':'Cant','precio':'P. Unit.','ganancia_pct':'% Ganancia 🔒','total':'Total'}
-                st.markdown("**Detalle de ítems (vista dueño):**")
-                st.dataframe(df_owner[cols_show].rename(columns=rename_map), use_container_width=True, hide_index=True)
+                # Columnas disponibles según versión del registro
+                col_order  = ['desc','cant','costo','ganancia_pct','precio','total']
+                col_labels = {'desc':'Descripción','cant':'Cant','costo':'Mi Costo 🔒',
+                              'ganancia_pct':'% Gan. 🔒','precio':'Precio cliente','total':'Total'}
+                cols_show  = [c for c in col_order if c in df_owner.columns]
+                st.markdown("**Detalle de ítems (vista propietario):**")
+                st.dataframe(df_owner[cols_show].rename(columns=col_labels),
+                             use_container_width=True, hide_index=True)
 
-            subtotal   = float(srv.get('subtotal', 0) or 0)
-            iva_pct    = float(srv.get('iva_porcentaje', 0) or 0)
-            iva_monto  = float(srv.get('iva_monto', 0) or 0)
-            total      = float(srv.get('total', 0) or 0)
+            subtotal       = float(srv.get('subtotal', 0) or 0)
+            iva_pct        = float(srv.get('iva_porcentaje', 0) or 0)
+            iva_monto      = float(srv.get('iva_monto', 0) or 0)
+            total          = float(srv.get('total', 0) or 0)
+            ganancia_total = float(srv.get('ganancia_total', 0) or 0)
 
             st.markdown("---")
-            c1, c2 = st.columns([3,1])
-            with c2:
-                st.metric("Subtotal", f"${subtotal:,.2f}")
-                if iva_pct > 0:
-                    st.metric(f"IVA ({iva_pct:.0f}%)", f"${iva_monto:,.2f}")
-                st.metric("**TOTAL A PAGAR**", f"${total:,.2f}")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Subtotal", f"${subtotal:,.2f}")
+            if iva_pct > 0:
+                c1.metric(f"IVA ({iva_pct:.0f}%)", f"${iva_monto:,.2f}")
+            c2.metric("TOTAL A PAGAR", f"${total:,.2f}")
+            c3.metric("GANANCIA NETA 🔒", f"${ganancia_total:,.2f}")
 
         # ── DESCARGA PDF ──────────────────────────────────────────────
         st.markdown("---")

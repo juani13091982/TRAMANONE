@@ -193,33 +193,50 @@ def show():
     st.markdown('<div class="sec-hdr">💰 PRESUPUESTO / DETALLE DE TRABAJOS</div>', unsafe_allow_html=True)
 
     if 'pres_items' not in st.session_state:
-        st.session_state.pres_items = [{'desc':'','cant':1,'precio':0.0,'ganancia_pct':0}]
+        st.session_state.pres_items = [{'desc':'','cant':1,'costo':0.0,'ganancia_pct':0}]
 
     def add_item():
-        st.session_state.pres_items.append({'desc':'','cant':1,'precio':0.0,'ganancia_pct':0})
+        st.session_state.pres_items.append({'desc':'','cant':1,'costo':0.0,'ganancia_pct':0})
     def remove_item(i):
         st.session_state.pres_items.pop(i)
 
-    # Encabezados de columnas
-    h1,h2,h3,h4,h5 = st.columns([4,1,2,1.5,0.5])
+    # Encabezados
+    h1,h2,h3,h4,h5,h6 = st.columns([3.5,1,2,1.5,2,0.5])
     h1.markdown("**Descripción**")
     h2.markdown("**Cant**")
-    h3.markdown("**Precio unit.**")
-    h4.markdown("**% Ganancia** 🔒")
-    h5.markdown("")
+    h3.markdown("**Mi Costo 🔒**")
+    h4.markdown("**% Gan. 🔒**")
+    h5.markdown("**Precio cliente**")
 
-    items_out = []
-    subtotal  = 0.0
+    items_out        = []
+    subtotal         = 0.0
+    ganancia_total_f = 0.0
+
     for idx, item in enumerate(st.session_state.pres_items):
-        c1,c2,c3,c4,c5 = st.columns([4,1,2,1.5,0.5])
-        desc     = c1.text_input("Desc",       key=f"desc_{idx}",  value=item.get('desc',''),          label_visibility='collapsed')
-        cant     = c2.number_input("Cant",     key=f"cant_{idx}",  value=item.get('cant',1),            min_value=1, step=1,     label_visibility='collapsed')
-        prec     = c3.number_input("Precio",   key=f"prec_{idx}",  value=float(item.get('precio',0)),   min_value=0.0, step=100.0, format="%.2f", label_visibility='collapsed')
-        gan_pct  = c4.number_input("% Gan",   key=f"gan_{idx}",   value=int(item.get('ganancia_pct',0)), min_value=0, max_value=500, step=5,    label_visibility='collapsed')
-        total_item = cant * prec
-        subtotal  += total_item
-        items_out.append({'desc': desc, 'cant': cant, 'precio': f"{prec:.2f}", 'ganancia_pct': gan_pct, 'total': f"{total_item:.2f}"})
-        if c5.button("🗑", key=f"del_{idx}", help="Eliminar línea") and len(st.session_state.pres_items) > 1:
+        c1,c2,c3,c4,c5,c6 = st.columns([3.5,1,2,1.5,2,0.5])
+        desc    = c1.text_input("Desc",    key=f"desc_{idx}", value=item.get('desc',''),         label_visibility='collapsed')
+        cant    = c2.number_input("Cant",  key=f"cant_{idx}", value=item.get('cant',1),           min_value=1, step=1,      label_visibility='collapsed')
+        costo   = c3.number_input("Costo", key=f"cost_{idx}", value=float(item.get('costo',0)),   min_value=0.0, step=100.0, format="%.2f", label_visibility='collapsed')
+        gan_pct = c4.number_input("% Gan", key=f"gan_{idx}",  value=int(item.get('ganancia_pct',0)), min_value=0, max_value=99, step=5, label_visibility='collapsed')
+
+        # Precio cliente = costo / (1 - ganancia%)
+        if 0 < gan_pct < 100:
+            precio_unit = costo / (1 - gan_pct / 100)
+        else:
+            precio_unit = costo
+
+        total_item    = cant * precio_unit
+        ganancia_item = cant * (precio_unit - costo)
+        subtotal         += total_item
+        ganancia_total_f += ganancia_item
+
+        c5.markdown(f"**${precio_unit:,.2f}**")
+        items_out.append({
+            'desc': desc, 'cant': cant,
+            'costo': f"{costo:.2f}", 'ganancia_pct': gan_pct,
+            'precio': f"{precio_unit:.2f}", 'total': f"{total_item:.2f}"
+        })
+        if c6.button("🗑", key=f"del_{idx}", help="Eliminar línea") and len(st.session_state.pres_items) > 1:
             remove_item(idx)
             st.rerun()
 
@@ -228,7 +245,7 @@ def show():
     # IVA y totales
     st.markdown("---")
     col_iva, col_tot = st.columns([3,1])
-    col_iva.empty()
+    col_iva.info(f"💡 Ganancia neta estimada: **${ganancia_total_f:,.2f}** (solo visible para vos)")
     with col_tot:
         iva_pct   = st.number_input("IVA %", min_value=0.0, max_value=100.0, step=0.5, value=0.0, format="%.1f", key="iva_pct_input")
         iva_monto = subtotal * iva_pct / 100
@@ -254,10 +271,10 @@ def show():
             st.error("El dominio/patente de la moto es obligatorio.")
             return
 
-        # Capturar valores de IVA del widget antes del spinner
-        iva_pct   = st.session_state.get("iva_pct_input", 0.0)
-        iva_monto = subtotal * iva_pct / 100
-        total     = subtotal + iva_monto
+        # Capturar valores del widget antes del spinner
+        iva_pct          = st.session_state.get("iva_pct_input", 0.0)
+        iva_monto        = subtotal * iva_pct / 100
+        total            = subtotal + iva_monto
 
         with st.spinner("Guardando y generando PDF..."):
             # Guardar / obtener cliente
@@ -313,6 +330,7 @@ def show():
                 subtotal=subtotal,
                 iva_porcentaje=iva_pct,
                 iva_monto=iva_monto,
+                ganancia_total=ganancia_total_f,
                 total=total,
             )
 

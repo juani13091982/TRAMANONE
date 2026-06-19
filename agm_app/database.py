@@ -142,7 +142,8 @@ def init_db():
             created_at           TEXT
         )"""))
         # Migración: agregar columnas nuevas si no existen (tablas ya creadas)
-        for col_def in ["iva_porcentaje FLOAT DEFAULT 0", "iva_monto FLOAT DEFAULT 0"]:
+        for col_def in ["iva_porcentaje FLOAT DEFAULT 0", "iva_monto FLOAT DEFAULT 0",
+                        "ganancia_total FLOAT DEFAULT 0"]:
             try:
                 conn.execute(text(f"ALTER TABLE servicios ADD COLUMN {col_def}"))
             except Exception:
@@ -276,13 +277,22 @@ def get_stats():
     with _get_engine().connect() as conn:
         sm   = _rows(conn.execute(text("""
             SELECT substr(fecha_ingreso,1,7) AS mes,
-                   COUNT(*) AS cantidad, SUM(total) AS facturacion
+                   COUNT(*) AS cantidad,
+                   SUM(total) AS facturacion,
+                   SUM(COALESCE(ganancia_total,0)) AS ganancia
             FROM servicios GROUP BY mes ORDER BY mes""")))
         tc   = _rows(conn.execute(text("""
-            SELECT cl.nombre, COUNT(*) AS servicios, SUM(s.total) AS total
+            SELECT cl.nombre, COUNT(*) AS servicios,
+                   SUM(s.total) AS total,
+                   SUM(COALESCE(s.ganancia_total,0)) AS ganancia
             FROM servicios s JOIN clientes cl ON cl.id=s.cliente_id
             GROUP BY s.cliente_id, cl.nombre
             ORDER BY servicios DESC LIMIT 10""")))
+        tc_gan = _rows(conn.execute(text("""
+            SELECT cl.nombre, SUM(COALESCE(s.ganancia_total,0)) AS ganancia
+            FROM servicios s JOIN clientes cl ON cl.id=s.cliente_id
+            GROUP BY s.cliente_id, cl.nombre
+            ORDER BY ganancia DESC LIMIT 10""")))
         tm   = _rows(conn.execute(text("""
             SELECT m.marca, m.modelo, COUNT(*) AS servicios
             FROM servicios s JOIN motos m ON m.id=s.moto_id
@@ -297,6 +307,7 @@ def get_stats():
             SELECT COUNT(*) AS total_servicios,
                    COUNT(DISTINCT cliente_id) AS total_clientes,
                    SUM(total) AS facturacion_total,
+                   SUM(COALESCE(ganancia_total,0)) AS ganancia_total,
                    SUM(CASE WHEN estado='Completado' THEN 1 ELSE 0 END) AS completados,
                    SUM(CASE WHEN estado='Pendiente'  THEN 1 ELSE 0 END) AS pendientes,
                    AVG(CASE WHEN hp_final IS NOT NULL AND hp_original IS NOT NULL
@@ -317,6 +328,6 @@ def get_stats():
                 text(f"SELECT COALESCE(SUM({col}),0) AS n FROM servicios")))
             trab.append({'trabajo': label, 'cantidad': int(r['n']) if r else 0})
     return {
-        'servicios_mes': sm, 'top_clientes': tc, 'top_motos': tm,
-        'marcas': marc, 'estados': est, 'trabajos': trab, 'kpis': kpis or {},
+        'servicios_mes': sm, 'top_clientes': tc, 'top_clientes_ganancia': tc_gan,
+        'top_motos': tm, 'marcas': marc, 'estados': est, 'trabajos': trab, 'kpis': kpis or {},
     }
