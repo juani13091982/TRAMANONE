@@ -138,16 +138,18 @@ def init_db():
             subtotal             FLOAT DEFAULT 0,
             iva_porcentaje       FLOAT DEFAULT 0,
             iva_monto            FLOAT DEFAULT 0,
+            ganancia_total       FLOAT DEFAULT 0,
             total                FLOAT DEFAULT 0,
             created_at           TEXT
         )"""))
-        # Migración: agregar columnas nuevas si no existen (tablas ya creadas)
-        for col_def in ["iva_porcentaje FLOAT DEFAULT 0", "iva_monto FLOAT DEFAULT 0",
-                        "ganancia_total FLOAT DEFAULT 0"]:
-            try:
-                conn.execute(text(f"ALTER TABLE servicios ADD COLUMN {col_def}"))
-            except Exception:
-                pass
+    # Migración: cada columna en su propia transacción (PostgreSQL requiere esto)
+    for col_def in ["iva_porcentaje FLOAT DEFAULT 0", "iva_monto FLOAT DEFAULT 0",
+                    "ganancia_total FLOAT DEFAULT 0"]:
+        try:
+            with _get_engine().begin() as _conn:
+                _conn.execute(text(f"ALTER TABLE servicios ADD COLUMN {col_def}"))
+        except Exception:
+            pass
 
 
 # ── CLIENTES ─────────────────────────────────────────────────────────────────
