@@ -91,17 +91,25 @@ div[data-testid="stMetric"] { background: #F9F9F9; border-radius:6px; padding:10
 /* Ocultar navegación automática de Streamlit (usamos la propia del sidebar) */
 [data-testid="stSidebarNav"] { display: none !important; }
 
-/* Ocultar toolbar superior (Share, estrella, lápiz, GitHub, menú) */
+/* Ocultar SOLO los botones del toolbar (Share, estrella, lápiz, GitHub, menú)
+   SIN ocultar el header completo — así el botón del panel lateral sigue funcionando */
 [data-testid="stToolbar"]          { display: none !important; }
 [data-testid="stDecoration"]       { display: none !important; }
 [data-testid="stStatusWidget"]     { display: none !important; }
-header[data-testid="stHeader"]     { display: none !important; }
+
+/* Dejar el header transparente (invisible pero presente para el toggle del sidebar) */
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
+    border-bottom: none !important;
+}
 
 /* Ocultar botón "Manage app" (esquina inferior derecha) */
 [data-testid="manage-app-button"]  { display: none !important; }
+[data-testid="stBottom"]           { display: none !important; }
 .viewerBadge_container__r5tak      { display: none !important; }
 #MainMenu                          { display: none !important; }
 footer                             { display: none !important; }
+footer + div                       { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
