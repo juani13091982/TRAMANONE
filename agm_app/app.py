@@ -23,12 +23,20 @@ init_db()
 # ── CSS global ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Sidebar */
+/* Sidebar — siempre visible, no se puede colapsar */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #0D0D0D 0%, #1A1A1A 100%);
+    transform: none !important;
+    min-width: 260px !important;
+    width: 260px !important;
+    display: flex !important;
 }
 [data-testid="stSidebar"] * { color: #EEEEEE !important; }
 [data-testid="stSidebar"] .stRadio label { font-size: 14px; }
+
+/* Ocultar el botón de colapsar/expandir el sidebar */
+[data-testid="collapsedControl"]   { display: none !important; }
+[data-testid="baseButton-headerNoPadding"] { display: none !important; }
 
 /* Header strip */
 .agm-header {
