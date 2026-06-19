@@ -278,12 +278,10 @@ def generate_pdf(srv: dict, cliente: dict, moto: dict, output_path: str):
     perf = [
         [
             p(f'<font color="#888888" size="7"><b>ECU ORIGINAL LEÍDA</b></font><br/>'
-              f'<font color="#228844" size="9">{"☑" if srv.get("ecu_leida") else "☐"} SÍ</font>  '
-              f'<font color="#CC0000" size="9">{"☑" if not srv.get("ecu_leida") else "☐"} NO</font>',
+              f'<font color="{"#228844" if srv.get("ecu_leida") else "#CC0000"}" size="11"><b>{"☑  SÍ" if srv.get("ecu_leida") else "☒  NO"}</b></font>',
               ps('pe_p',color=DARK,leading=13)),
             p(f'<font color="#888888" size="7"><b>BACKUP REALIZADO</b></font><br/>'
-              f'<font color="#228844" size="9">{"☑" if srv.get("backup_realizado") else "☐"} SÍ</font>  '
-              f'<font color="#CC0000" size="9">{"☑" if not srv.get("backup_realizado") else "☐"} NO</font>',
+              f'<font color="{"#228844" if srv.get("backup_realizado") else "#CC0000"}" size="11"><b>{"☑  SÍ" if srv.get("backup_realizado") else "☒  NO"}</b></font>',
               ps('pb_p',color=DARK,leading=13)),
             mf('MAPA / CALIBRACIÓN', srv.get('mapa_aplicado','')),
             mf('HERRAMIENTA / SOFTWARE', srv.get('software_herramienta','')),
