@@ -32,6 +32,8 @@ def _get_engine():
         kw = {}
         if "sqlite" in url:
             kw["connect_args"] = {"check_same_thread": False}
+        else:
+            kw["connect_args"] = {"sslmode": "require"}
         _engine = create_engine(url, echo=False, pool_pre_ping=True, **kw)
     return _engine
 
