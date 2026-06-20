@@ -34,6 +34,9 @@ def _get_engine():
             kw["connect_args"] = {"check_same_thread": False}
         else:
             kw["connect_args"] = {"sslmode": "require"}
+            kw["pool_size"]    = 5
+            kw["max_overflow"] = 10
+            kw["pool_timeout"] = 20
         _engine = create_engine(url, echo=False, pool_pre_ping=True, **kw)
     return _engine
 
@@ -271,6 +274,17 @@ def get_servicios_full(limit=500):
             LIMIT {int(limit)}
         """)))
 
+def get_stats_clientes():
+    """Agrega servicios y facturación por cliente en SQL (evita cargar todos los registros)."""
+    with _get_engine().connect() as conn:
+        return _rows(conn.execute(text("""
+            SELECT cliente_id,
+                   COUNT(*) AS servicios,
+                   SUM(COALESCE(total,0)) AS facturacion
+            FROM servicios
+            GROUP BY cliente_id
+        """)))
+
 def delete_servicio(sid: int):
     with _get_engine().begin() as conn:
         conn.execute(text("DELETE FROM servicios WHERE id=:id"), {"id": sid})
@@ -315,7 +329,24 @@ def get_stats():
                    AVG(CASE WHEN hp_final IS NOT NULL AND hp_original IS NOT NULL
                             THEN hp_final - hp_original END) AS ganancia_hp_avg
             FROM servicios""")))
-        cols = [
+        trab_row = _row(conn.execute(text("""
+            SELECT
+                COALESCE(SUM(trab_service),0)       AS trab_service,
+                COALESCE(SUM(trab_aceite),0)        AS trab_aceite,
+                COALESCE(SUM(trab_filtro_aceite),0) AS trab_filtro_aceite,
+                COALESCE(SUM(trab_filtro_aire),0)   AS trab_filtro_aire,
+                COALESCE(SUM(trab_bujias),0)        AS trab_bujias,
+                COALESCE(SUM(trab_valvulas),0)      AS trab_valvulas,
+                COALESCE(SUM(trab_diagnostico),0)   AS trab_diagnostico,
+                COALESCE(SUM(trab_ecu),0)           AS trab_ecu,
+                COALESCE(SUM(trab_dyno),0)          AS trab_dyno,
+                COALESCE(SUM(trab_frenos),0)        AS trab_frenos,
+                COALESCE(SUM(trab_transmision),0)   AS trab_transmision,
+                COALESCE(SUM(trab_suspension),0)    AS trab_suspension,
+                COALESCE(SUM(trab_electrica),0)     AS trab_electrica,
+                COALESCE(SUM(trab_lavado),0)        AS trab_lavado
+            FROM servicios""")))
+        trab_labels = [
             ('trab_service','Service General'),('trab_aceite','Cambio Aceite'),
             ('trab_filtro_aceite','Filtro Aceite'),('trab_filtro_aire','Filtro Aire'),
             ('trab_bujias','Bujías'),('trab_valvulas','Válvulas'),
@@ -324,11 +355,8 @@ def get_stats():
             ('trab_transmision','Transmisión'),('trab_suspension','Suspensión'),
             ('trab_electrica','Eléctrica'),('trab_lavado','Lavado'),
         ]
-        trab = []
-        for col, label in cols:
-            r = _row(conn.execute(
-                text(f"SELECT COALESCE(SUM({col}),0) AS n FROM servicios")))
-            trab.append({'trabajo': label, 'cantidad': int(r['n']) if r else 0})
+        trab = [{'trabajo': lbl, 'cantidad': int((trab_row or {}).get(col) or 0)}
+                for col, lbl in trab_labels]
     return {
         'servicios_mes': sm, 'top_clientes': tc, 'top_clientes_ganancia': tc_gan,
         'top_motos': tm, 'marcas': marc, 'estados': est, 'trabajos': trab, 'kpis': kpis or {},

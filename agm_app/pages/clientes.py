@@ -3,9 +3,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 """Gestión de clientes — AGM Performance."""
 import streamlit as st
 import pandas as pd
-from database import get_clientes, get_motos_cliente, get_servicios_full, update_servicio
+from database import get_clientes, get_motos_cliente, get_servicios_full, get_stats_clientes, update_servicio
 
 ESTADOS = ['Pendiente', 'En proceso', 'Completado', 'Entregado']
+
+@st.cache_data(ttl=60)
+def _clientes():
+    return get_clientes()
+
+@st.cache_data(ttl=60)
+def _stats_clientes():
+    return get_stats_clientes()
+
+@st.cache_data(ttl=60)
+def _hist_cliente(cli_id):
+    return get_servicios_full(limit=200)
 
 
 def show():
@@ -16,23 +28,17 @@ def show():
         <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
     </div>""", unsafe_allow_html=True)
 
-    clientes = get_clientes()
+    clientes = _clientes()
     if not clientes:
         st.info("Sin clientes aún. Creá el primero al cargar una nueva ficha de service.")
         return
 
-    # Enriquecer con conteo de servicios
-    servicios = get_servicios_full(limit=1000)
-    srv_por_cli = {}
-    fact_por_cli = {}
-    for s in servicios:
-        cid = s['cliente_id']
-        srv_por_cli[cid]  = srv_por_cli.get(cid, 0) + 1
-        fact_por_cli[cid] = fact_por_cli.get(cid, 0) + float(s.get('total') or 0)
-
+    # Estadísticas por cliente en una sola query SQL (sin cargar todos los servicios)
+    stats_map = {r['cliente_id']: r for r in _stats_clientes()}
     for c in clientes:
-        c['servicios']    = srv_por_cli.get(c['id'], 0)
-        c['facturacion']  = fact_por_cli.get(c['id'], 0)
+        st_row = stats_map.get(c['id'], {})
+        c['servicios']   = st_row.get('servicios', 0)
+        c['facturacion'] = float(st_row.get('facturacion') or 0)
 
     df = pd.DataFrame(clientes)
 
@@ -86,8 +92,9 @@ def show():
             })
             st.dataframe(df_motos, use_container_width=True, hide_index=True)
 
-        # Historial del cliente
-        hist = [s for s in servicios if s['cliente_id'] == cli['id']]
+        # Historial del cliente (cargado solo cuando se abre la ficha)
+        todos = _hist_cliente(cli['id'])
+        hist = [s for s in todos if s['cliente_id'] == cli['id']]
         if hist:
             st.markdown("#### 📋 Historial de servicios")
             df_hist = pd.DataFrame(hist)[['numero_orden','fecha_ingreso','marca','modelo',
@@ -113,5 +120,7 @@ def show():
                     srv_match = next((s for s in hist if s['numero_orden'] == orden_sel), None)
                     if srv_match:
                         update_servicio(srv_match['id'], {'estado': nuevo_estado})
+                        _stats_clientes.clear()
+                        _hist_cliente.clear()
                         st.success(f"Estado de {orden_sel} actualizado a **{nuevo_estado}**.")
                         st.rerun()

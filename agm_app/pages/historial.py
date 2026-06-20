@@ -7,6 +7,10 @@ import json, os, tempfile
 from database import get_servicios_full, get_servicio, get_cliente, get_moto, update_servicio, delete_servicio
 from pdf_export import generate_pdf
 
+@st.cache_data(ttl=60)
+def _servicios_full():
+    return get_servicios_full(limit=500)
+
 
 def show():
     st.markdown("""
@@ -16,7 +20,7 @@ def show():
         <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
     </div>""", unsafe_allow_html=True)
 
-    servicios = get_servicios_full(limit=500)
+    servicios = _servicios_full()
     if not servicios:
         st.info("No hay servicios registrados aún. Cargá la primera ficha en **Nueva Ficha de Service**.")
         return
@@ -87,9 +91,10 @@ def show():
         idx = sel_rows[0]
         row = df_f.iloc[idx]
         sid = int(row['id'])
-        srv = get_servicio(sid)
-        cli = get_cliente(srv['cliente_id'])
-        moto = get_moto(srv['moto_id'])
+        srv = get_servicio(sid)   # fetch completo con JSON/observaciones
+        # cli y moto se construyen del JOIN ya cargado; solo se buscan completos para PDF
+        cli_cached  = {'nombre': row.get('cliente_nombre',''), 'telefono': row.get('cliente_tel',''), 'email': row.get('cliente_email','')}
+        moto_cached = {'marca': row.get('marca',''), 'modelo': row.get('modelo',''), 'anio': row.get('anio',''), 'dominio': row.get('dominio',''), 'color': row.get('color','')}
 
         st.markdown("---")
         col_titulo, col_del = st.columns([5,1])
@@ -104,6 +109,7 @@ def show():
             c_si, c_no = st.columns(2)
             if c_si.button("✅ Sí, eliminar", key=f"confirm_yes_{sid}"):
                 delete_servicio(sid)
+                _servicios_full.clear()
                 st.session_state.pop(f"confirm_del_{sid}", None)
                 st.success("Servicio eliminado.")
                 st.rerun()
@@ -115,8 +121,8 @@ def show():
 
         with tab1:
             c1,c2,c3 = st.columns(3)
-            c1.metric("Cliente", cli.get('nombre','') if cli else '─')
-            c2.metric("Moto", f"{moto.get('marca','')} {moto.get('modelo','')}" if moto else '─')
+            c1.metric("Cliente", cli_cached.get('nombre','─'))
+            c2.metric("Moto", f"{moto_cached.get('marca','')} {moto_cached.get('modelo','')}" or '─')
             c3.metric("Estado", srv.get('estado','─'))
             c4,c5,c6 = st.columns(3)
             c4.metric("Ingreso", srv.get('fecha_ingreso','─'))
@@ -130,6 +136,7 @@ def show():
                                         key=f"estado_sel_{sid}")
             if st.button("💾 Actualizar estado", key=f"upd_{sid}"):
                 update_servicio(sid, {'estado': nuevo_estado})
+                _servicios_full.clear()
                 st.success("Estado actualizado.")
                 st.rerun()
 
@@ -220,7 +227,9 @@ def show():
 
         if st.button("🖨️ Generar / Descargar PDF", type="primary"):
             with st.spinner("Generando PDF..."):
-                generate_pdf(srv, cli or {}, moto or {}, pdf_path)
+                cli_full  = get_cliente(srv['cliente_id']) or cli_cached
+                moto_full = get_moto(srv['moto_id'])       or moto_cached
+                generate_pdf(srv, cli_full, moto_full, pdf_path)
             with open(pdf_path, 'rb') as f:
                 st.download_button(
                     "⬇️ Descargar PDF",

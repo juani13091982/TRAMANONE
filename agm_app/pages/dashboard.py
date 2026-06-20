@@ -8,6 +8,14 @@ import pandas as pd
 import base64
 from database import get_stats, get_servicios_full
 
+@st.cache_data(ttl=60)
+def _get_stats():
+    return get_stats()
+
+@st.cache_data(ttl=60)
+def _get_recientes():
+    return get_servicios_full(limit=10)
+
 COLORS = {
     'red':    '#CC0000',
     'gold':   '#D4AF37',
@@ -73,7 +81,7 @@ def show():
         {img_html}
     </div>""", unsafe_allow_html=True)
 
-    stats = get_stats()
+    stats = _get_stats()
     kpis  = stats['kpis']
 
     total_srv    = kpis.get('total_servicios') or 0
@@ -295,7 +303,7 @@ def show():
 
     # ── ÚLTIMOS SERVICIOS ──────────────────────────────────────────────
     st.markdown('<div class="sec-hdr">🕐 ÚLTIMOS 10 SERVICIOS</div>', unsafe_allow_html=True)
-    servicios = get_servicios_full(limit=10)
+    servicios = _get_recientes()
     if servicios:
         df_last = pd.DataFrame(servicios)[[
             'numero_orden','fecha_ingreso','cliente_nombre',
