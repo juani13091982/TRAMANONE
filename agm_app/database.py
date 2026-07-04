@@ -33,10 +33,9 @@ def _get_engine():
         if "sqlite" in url:
             kw["connect_args"] = {"check_same_thread": False}
         else:
+            # Supabase Transaction Pooler (port 6543) ya hace pooling propio;
+            # no configuramos pool extra para evitar conflictos.
             kw["connect_args"] = {"sslmode": "require"}
-            kw["pool_size"]    = 5
-            kw["max_overflow"] = 10
-            kw["pool_timeout"] = 20
         _engine = create_engine(url, echo=False, pool_pre_ping=True, **kw)
     return _engine
 
