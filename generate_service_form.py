@@ -1056,5 +1056,5 @@ def generate_premium_pdf(output_path='AGM_Ficha_Service_PREMIUM.pdf'):
 
 
 if __name__ == '__main__':
-    os.chdir('/home/user/TRAMANONE')
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     generate_premium_pdf('AGM_Ficha_Service_PREMIUM.pdf')
