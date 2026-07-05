@@ -4,12 +4,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import streamlit as st
 import pandas as pd
 import json, os, tempfile
-from database import get_servicios_full, get_servicio, get_cliente, get_moto, update_servicio, delete_servicio
+from database import get_servicio, get_cliente, get_moto, update_servicio, delete_servicio
 from pdf_export import generate_pdf
-
-@st.cache_data(ttl=60)
-def _servicios_full():
-    return get_servicios_full(limit=500)
+import data_cache
 
 
 def show():
@@ -20,7 +17,7 @@ def show():
         <span class="hdr-brand">AGM Performance Service &amp; Chiptunning</span>
     </div>""", unsafe_allow_html=True)
 
-    servicios = _servicios_full()
+    servicios = data_cache.servicios_full()
     if not servicios:
         st.info("No hay servicios registrados aún. Cargá la primera ficha en **Nueva Ficha de Service**.")
         return
@@ -109,7 +106,7 @@ def show():
             c_si, c_no = st.columns(2)
             if c_si.button("✅ Sí, eliminar", key=f"confirm_yes_{sid}"):
                 delete_servicio(sid)
-                _servicios_full.clear()
+                data_cache.clear_all()
                 st.session_state.pop(f"confirm_del_{sid}", None)
                 st.success("Servicio eliminado.")
                 st.rerun()
@@ -136,7 +133,7 @@ def show():
                                         key=f"estado_sel_{sid}")
             if st.button("💾 Actualizar estado", key=f"upd_{sid}"):
                 update_servicio(sid, {'estado': nuevo_estado})
-                _servicios_full.clear()
+                data_cache.clear_all()
                 st.success("Estado actualizado.")
                 st.rerun()
 

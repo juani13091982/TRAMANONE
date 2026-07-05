@@ -4,20 +4,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import streamlit as st
 import json, os
 from datetime import date, datetime
-from database import (get_clientes, upsert_cliente, get_motos_cliente,
-                      upsert_moto, next_orden, insert_servicio, get_cliente, get_moto)
+from database import (upsert_cliente, upsert_moto, next_orden,
+                      insert_servicio, get_cliente, get_moto)
 from pdf_export import generate_pdf
+import data_cache
 
 MAX_ITEMS = 8   # filas de presupuesto (vacías se ignoran al guardar)
-
-# ── Caché de consultas frecuentes (evita ir a la BD en cada rerun) ────────────
-@st.cache_data(ttl=120)
-def _clientes():
-    return get_clientes()
-
-@st.cache_data(ttl=120)
-def _motos_de(cliente_id):
-    return get_motos_cliente(cliente_id)
 
 
 def show():
@@ -72,7 +64,7 @@ def show():
 
     # ── SELECTOR DE CLIENTE ───────────────────────────────────────────
     st.markdown('<div class="sec-hdr">👤 DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-    clientes    = _clientes()
+    clientes    = data_cache.clientes()
     cli_nombres = ["+ Nuevo cliente"] + [f"{c['nombre']} ({c['dni_cuit'] or 'sin DNI'})" for c in clientes]
     cli_sel     = st.selectbox("Cliente", cli_nombres, label_visibility='collapsed')
 
@@ -105,7 +97,7 @@ def show():
     moto_anio  = datetime.now().year
 
     if cliente_id_existente:
-        motos = _motos_de(cliente_id_existente)
+        motos = data_cache.motos_de(cliente_id_existente)
         if motos:
             moto_opts = ["+ Nueva moto"] + [f"{m['marca']} {m['modelo']} — {m['dominio']}" for m in motos]
             moto_sel  = st.selectbox("Moto del cliente", moto_opts, label_visibility='collapsed')
@@ -356,8 +348,7 @@ def show():
             generate_pdf(srv_data, cli_full, moto_full, pdf_path)
 
             # Invalidar caché para que el nuevo cliente/moto aparezcan la próxima vez
-            _clientes.clear()
-            _motos_de.clear()
+            data_cache.clear_all()
 
             st.session_state.srv_guardado  = {'orden': numero_orden, 'id': sid}
             st.session_state.srv_pdf_path  = pdf_path

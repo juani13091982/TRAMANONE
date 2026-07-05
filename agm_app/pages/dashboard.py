@@ -6,15 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import base64
-from database import get_stats, get_servicios_full
-
-@st.cache_data(ttl=60)
-def _get_stats():
-    return get_stats()
-
-@st.cache_data(ttl=60)
-def _get_recientes():
-    return get_servicios_full(limit=10)
+import data_cache
 
 COLORS = {
     'red':    '#CC0000',
@@ -81,7 +73,7 @@ def show():
         {img_html}
     </div>""", unsafe_allow_html=True)
 
-    stats = _get_stats()
+    stats = data_cache.stats()
     kpis  = stats['kpis']
 
     total_srv    = kpis.get('total_servicios') or 0
@@ -303,7 +295,7 @@ def show():
 
     # ── ÚLTIMOS SERVICIOS ──────────────────────────────────────────────
     st.markdown('<div class="sec-hdr">🕐 ÚLTIMOS 10 SERVICIOS</div>', unsafe_allow_html=True)
-    servicios = _get_recientes()
+    servicios = data_cache.servicios_recientes()
     if servicios:
         df_last = pd.DataFrame(servicios)[[
             'numero_orden','fecha_ingreso','cliente_nombre',
