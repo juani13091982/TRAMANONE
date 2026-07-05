@@ -34,8 +34,8 @@ def _get_engine():
             kw["connect_args"] = {"check_same_thread": False}
         else:
             # Supabase Transaction Pooler (port 6543) ya hace pooling propio;
-            # no configuramos pool extra para evitar conflictos.
-            kw["connect_args"] = {"sslmode": "require"}
+            # connect_timeout evita que la app quede colgada si la BD está pausada.
+            kw["connect_args"] = {"sslmode": "require", "connect_timeout": 10}
         _engine = create_engine(url, echo=False, pool_pre_ping=True, **kw)
     return _engine
 

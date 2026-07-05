@@ -17,8 +17,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Inicializar BD al arrancar
-init_db()
+# Inicializar BD al arrancar — con mensaje claro si la BD no responde
+try:
+    init_db()
+except Exception as e:
+    st.error(
+        "⚠️ **No se pudo conectar a la base de datos.**\n\n"
+        "Si usás Supabase gratuito, el proyecto puede estar **pausado por inactividad**: "
+        "entrá a [supabase.com](https://supabase.com/dashboard), abrí tu proyecto y tocá **Restore/Resume**. "
+        "Después recargá esta página.\n\n"
+        f"Detalle técnico: `{e}`"
+    )
+    st.stop()
 
 # ── CSS global ───────────────────────────────────────────────────────────────
 st.markdown("""
