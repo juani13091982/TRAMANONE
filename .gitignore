@@ -1,1 +1,4 @@
-agm_app/__pycache__/
+__pycache__/
+*.pyc
+agm_app/agm_service.db
+agm_app/pdfs/
